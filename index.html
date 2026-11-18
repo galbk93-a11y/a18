@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מספירה לכפל – תרגול הסתברות</title>
+<style>
+  body{font-family:Arial,"Segoe UI",sans-serif;background:#f4f7fb;margin:0;padding:20px;color:#1f2a37;line-height:1.7}
+  .wrap{max-width:900px;margin:auto}
+  h1{text-align:center;color:#1d4e89;margin-bottom:4px}
+  .sub{text-align:center;color:#555;margin-top:0}
+  h2{background:#1d4e89;color:#fff;padding:10px 16px;border-radius:10px;margin-top:40px;font-size:1.25em}
+  .info{background:#fff8e1;border-right:6px solid #f4b400;padding:12px 16px;border-radius:8px;margin:14px 0}
+  .ex{background:#fff;border-radius:12px;padding:16px 20px;margin:18px 0;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+  .ex h3{margin:0 0 8px;color:#1d4e89}
+  ol.parts{list-style:hebrew;margin:6px 0;padding-right:24px}
+  .btns{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+  button{border:none;border-radius:8px;padding:8px 14px;font-size:15px;cursor:pointer;font-family:inherit}
+  .b-tree{background:#e3f0ff;color:#1d4e89}
+  .b-ans{background:#2e7d32;color:#fff}
+  .b-info{background:#f4b400;color:#222}
+  .b-cor{background:#fde7c8;color:#7a4100}
+  .panel{display:none;margin-top:12px;padding:12px;border-radius:8px;background:#f7faff;border:1px solid #d6e4f5;overflow-x:auto}
+  .panel.ans{background:#eef8ee;border-color:#bfe0c0}
+  .panel.open{display:block}
+  .m{direction:ltr;unicode-bidi:isolate;display:inline-block;white-space:nowrap}
+  .fr{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;font-size:.9em;margin:0 2px}
+  .fr span:first-child{border-bottom:1.5px solid currentColor;padding:0 3px}
+  table.grid{border-collapse:collapse;margin:auto;direction:ltr}
+  table.grid td,table.grid th{border:1px solid #b9c9de;padding:4px 7px;text-align:center;font-size:14px}
+  table.grid th{background:#e3f0ff}
+  .ball{display:inline-block;width:20px;height:20px;border-radius:50%;color:#fff;font-size:12px;line-height:20px;text-align:center;font-weight:bold}
+  .r{background:#d32f2f}.bl{background:#1565c0}
+  .summary{background:#e8f5e9;border-right:6px solid #2e7d32;padding:14px 18px;border-radius:8px;margin-top:30px}
+  svg text{font-family:Arial,sans-serif}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>מספירה לכפל 🌳</h1>
+  <p class="sub">פותרים במחברת. העץ או הטבלה יופיעו רק בלחיצה על הכפתור.</p>
+  <div id="app"></div>
+</div>
+
+<script>
+const F=(a,b)=>`<span class="fr"><span>${a}</span><span>${b}</span></span>`;
+const M=s=>`<span class="m">${s}</span>`;
+const ball=(c,n)=>`<span class="ball ${c}">${n}</span>`;
+
+// ---------- ציור עץ אנכי (השורש למעלה) ----------
+const gcd=(a,b)=>b?gcd(b,a%b):a;
+function mulStr(ps){
+  if(ps.every(p=>p.includes('/'))){
+    let a=1,b=1; ps.forEach(p=>{const[x,y]=p.split('/').map(Number);a*=x;b*=y;});
+    const g=gcd(a,b); a/=g; b/=g; return b==1?String(a):a+'/'+b;
+  }
+  let v=1; ps.forEach(p=>v*=parseFloat(p)); return String(parseFloat(v.toFixed(6)));
+}
+const SUP='⁰¹²³⁴⁵⁶⁷⁸⁹';
+function prodStr(ps){
+  if(ps.length>2 && ps.every(p=>p==ps[0])) return `(${ps[0]})`+String(ps.length).split('').map(d=>SUP[d]).join('');
+  return ps.join('·');
+}
+const pillW=t=>Math.max(26,t.length*9+14);
+const HEB=/[\u0590-\u05FF]/;
+const GREEN='#2e7d32';
+function ctree(levels, o={}){
+  const L=levels.length, showP=o.showP!==false;
+  const hasSet=levels.some(l=>l.some(b=>b.set));
+  const leaves=[];
+  (function walk(path){const d=path.length;
+    if(d==L||(d>0&&o.prune&&!o.prune(path))){leaves.push(path);return;}
+    levels[d].forEach(b=>walk([...path,b]));})([]);
+  const leafData=leaves.map(p=>{
+    if(p.length<L) return {lines:[{t:'…',c:'#999'}],m:false};
+    if(o.leaf) return {lines:[{t:o.leaf(p),c:'#333'}],m:false};
+    const ps=p.map(b=>b.p), m=o.mark?o.mark(p):'', col=m?GREEN:'#333';
+    const lines=[{t:prodStr(ps),c:col,b:!!m},{t:'= '+mulStr(ps),c:col,b:!!m}];
+    if(m) lines.push({t:('✓ '+m).trim(),c:GREEN,b:true});
+    return {lines,m:!!m};
+  });
+  const setW=Math.max(0,...levels.flat().map(b=>b.set?b.set.length*6.5:0));
+  const leafW=Math.max(54,setW,...leafData.flatMap(l=>l.lines.map(x=>x.t.length*7.2)),...levels[L-1].map(b=>pillW(b.l)))+14;
+  const dy=hasSet?100:82, W=leaves.length*leafW+20;
+  const yN=d=>22+d*dy;
+  let edges='',nodes='',texts='',li=0;
+  const dir=t=>HEB.test(t)?'direction="rtl"':'';
+  const node=(cx,cy,b,m)=>{const w=pillW(b.l);
+    let s=`<rect x="${cx-w/2}" y="${cy-12}" width="${w}" height="24" rx="12" fill="${m?'#e8f5e9':'#fff'}" stroke="${m?GREEN:'#1d4e89'}" stroke-width="${m?2.2:1.5}"/><text x="${cx}" y="${cy+5}" text-anchor="middle" font-size="14" fill="${m?GREEN:'#1d4e89'}" ${dir(b.l)}>${b.l}</text>`;
+    if(b.set) s+=`<text x="${cx}" y="${cy+28}" text-anchor="middle" font-size="12" fill="#666" ${dir(b.set)}>${b.set}</text>`;
+    return s;};
+  function rec(path){
+    const d=path.length, isLeaf=d==L||(d>0&&o.prune&&!o.prune(path));
+    if(isLeaf){
+      const ld=leafData[li], x=W-10-leafW*(li+.5); li++;
+      let y=yN(d)+(path[d-1].set?50:34);
+      ld.lines.forEach(l=>{texts+=`<text x="${x}" y="${y}" text-anchor="middle" font-size="13" fill="${l.c}" font-weight="${l.b?'bold':'normal'}" ${dir(l.t)}>${l.t}</text>`;y+=17;});
+      return {x,m:ld.m};
+    }
+    const ch=levels[d].map(b=>({b,...rec([...path,b])}));
+    const x=(ch[0].x+ch[ch.length-1].x)/2;
+    const y0=d==0?yN(0)+6:yN(d)+(path[d-1].set?34:12);
+    ch.forEach(c=>{
+      const y1=yN(d+1)-12;
+      edges+=`<line x1="${x}" y1="${y0}" x2="${c.x}" y2="${y1}" stroke="${c.m?GREEN:'#7a8ca5'}" stroke-width="${c.m?3:1.6}"/>`;
+      if(showP) texts+=`<text x="${(x+c.x)/2}" y="${(y0+y1)/2+4}" text-anchor="middle" font-size="13" fill="#c62828" font-weight="bold" stroke="#fff" stroke-width="4" paint-order="stroke">${c.b.p}</text>`;
+      nodes+=node(c.x,yN(d+1),c.b,c.m);
+    });
+    return {x,m:ch.some(c=>c.m)};
+  }
+  const r=rec([]);
+  nodes+=`<circle cx="${r.x}" cy="${yN(0)}" r="6" fill="#1d4e89"/>`;
+  const H=yN(L)+(hasSet?50:34)+3*17;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%;direction:ltr;display:block;margin:auto" xmlns="http://www.w3.org/2000/svg">${edges}${nodes}${texts}</svg>`;
+}
+// עץ דו־שלבי (עץ מלא / עץ מקוצר)
+function tree(first, second, o={}){
+  return ctree([first,second],{showP:!!o.p, leaf:p=>o.leaf?o.leaf(p[0],p[1]):`${p[0].l} , ${p[1].l}`});
+}
+
+function grid(rows, cols, cell, rowTitle, colTitle){
+  let h=`<table class="grid"><tr><th>${rowTitle} ↓ / ${colTitle} →</th>${cols.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+  rows.forEach((r,i)=>{h+=`<tr><th>${r}</th>${cols.map((c,j)=>`<td>${cell(i,j)}</td>`).join('')}</tr>`;});
+  return h+'</table>';
+}
+
+const COIN=[{l:'עץ',p:'1/2'},{l:'פלי',p:'1/2'}];
+const DIE=[1,2,3,4,5,6].map(n=>({l:String(n),p:'1/6'}));
+const SPIN3=[{l:'אדום',p:'1/3'},{l:'כחול',p:'1/3'},{l:'ירוק',p:'1/3'}];
+const SPIN4=[{l:'צהוב',p:'1/4'},{l:'ירוק',p:'1/4'},{l:'כחול',p:'1/4'},{l:'אדום',p:'1/4'}];
+const YEL=[{l:'צהוב',p:'1/4'},{l:'לא צהוב',p:'3/4'}];
+const SIX=[{l:'6',p:'1/6'},{l:'לא 6',p:'5/6'}];
+const BAG=[{l:'אדום',p:'3/5'},{l:'כחול',p:'2/5'}];
+const SHOT=[{l:'קלע',p:'0.7'},{l:'החטיא',p:'0.3'}];
+const SPINU=[{l:'אדום',p:'1/2'},{l:'כחול',p:'1/3'},{l:'ירוק',p:'1/6'}];
+const prodLeaf=(a,b)=>`${a.p} · ${b.p}`;
+
+const diceGrid=grid([1,2,3,4,5,6],[1,2,3,4,5,6],(i,j)=>`(${i+1},${j+1})`,'קובייה 1','קובייה 2');
+const balls=[ball('r',1),ball('r',2),ball('r',3),ball('bl',4),ball('bl',5)];
+const bagGrid=grid(balls,balls,(i,j)=>balls[i]+balls[j],'הוצאה 1','הוצאה 2');
+
+const SECTIONS=[
+{ title:'חלק א – סופרים… ואז כופלים',
+  intro:'בכל תרגיל: קודם פותרים כמו שאנחנו רגילים – עץ או טבלה, וספירה של <b>רצוי חלקי מצוי</b>. אחר כך בודקים משהו חדש.',
+  items:[
+  { q:`מטילים מטבע, ואחר כך מטילים קובייה.
+     <ol class="parts">
+      <li>שרטטו עץ. כמה תוצאות אפשריות יש בניסוי?</li>
+      <li>חשבו בעזרת ספירה את ההסתברות לקבל "עץ" <b>וגם</b> מספר זוגי.</li>
+      <li>מה ההסתברות לקבל "עץ" במטבע לבד? מה ההסתברות לקבל מספר זוגי בקובייה לבד?</li>
+      <li>כפלו את שתי ההסתברויות מסעיף ג. השוו לתשובה של סעיף ב. מה גיליתם?</li>
+     </ol>`,
+    tree:tree(COIN,DIE),
+    ans:`א. 12 תוצאות.<br>ב. ${M(F(3,12)+' = '+F(1,4))}<br>ג. ${M('P(עץ) = '+F(1,2))} , ${M('P(זוגי) = '+F(3,6)+' = '+F(1,2))}<br>ד. ${M(F(1,2)+' · '+F(1,2)+' = '+F(1,4))} – יצא בדיוק כמו בספירה!` },
+
+  { q:`מסובבים סביבון עם 3 גזרות שוות: אדום, כחול וירוק. אחר כך מטילים מטבע.
+     <ol class="parts">
+      <li>בעזרת עץ וספירה: מה ההסתברות לקבל אדום <b>וגם</b> "פלי"?</li>
+      <li>בעזרת ספירה: מה ההסתברות לקבל צבע <b>שאינו</b> אדום <b>וגם</b> "עץ"?</li>
+      <li>מצאו את ${M('P(אדום)')}, ${M('P(לא אדום)')} ו־${M('P(עץ)')}. בדקו: האם מכפלת ההסתברויות נותנת את התשובות של סעיפים א ו־ב?</li>
+     </ol>`,
+    tree:tree(SPIN3,COIN),
+    ans:`א. ${M(F(1,6))}<br>ב. ${M(F(2,6)+' = '+F(1,3))}<br>ג. ${M('P(אדום) = '+F(1,3))}, ${M('P(לא אדום) = '+F(2,3))}, ${M('P(עץ) = '+F(1,2))}<br>
+         ${M(F(1,3)+' · '+F(1,2)+' = '+F(1,6))} ✓ &nbsp;&nbsp; ${M(F(2,3)+' · '+F(1,2)+' = '+F(2,6)+' = '+F(1,3))} ✓` },
+
+  { q:`מטילים שתי קוביות (את הראשונה ואז את השנייה). השתמשו בטבלה.
+     <ol class="parts">
+      <li>בעזרת ספירה: מה ההסתברות ששתי הקוביות יראו מספר <b>גדול מ־4</b>?</li>
+      <li>בעזרת ספירה: מה ההסתברות שבקובייה הראשונה יצא 1, ובשנייה יצא מספר זוגי?</li>
+      <li>פתרו את סעיפים א ו־ב שוב: חשבו את ההסתברות של כל קובייה לבד וכפלו. האם יצא אותו דבר?</li>
+     </ol>`,
+    treeLabel:'הצג טבלה', tree:diceGrid,
+    ans:`א. 4 משבצות מתוך 36: ${M(F(4,36)+' = '+F(1,9))}<br>ב. 3 משבצות מתוך 36: ${M(F(3,36)+' = '+F(1,12))}<br>
+         ג. ${M(F(2,6)+' · '+F(2,6)+' = '+F(4,36)+' = '+F(1,9))} ✓ &nbsp;&nbsp; ${M(F(1,6)+' · '+F(3,6)+' = '+F(3,36)+' = '+F(1,12))} ✓` }
+  ],
+  after:{ label:'💡 מה גילינו?',
+    html:`כשמבצעים שני ניסויים ש<b>לא משפיעים זה על זה</b>, ההסתברות שיקרו גם מאורע מהניסוי הראשון וגם מאורע מהניסוי השני היא <b>מכפלת ההסתברויות</b>:<br>
+      <div style="text-align:center;margin-top:6px">${M('P(A וגם B) = P(A) · P(B)')}</div>` }
+},
+
+{ title:'חלק ב – למה זה עובד? העץ המקוצר',
+  intro:`נסתכל שוב על העץ של מטבע וקובייה (תרגיל 1). יש בו 12 קצוות.<br>
+    • <b>חצי</b> מהקצוות יוצאים מהענף "עץ" – 6 מתוך 12.<br>
+    • מתוך הקצוות של "עץ", <b>חצי</b> הם מספר זוגי – 3 מתוך 6.<br>
+    לכן המאורע הוא <b>חצי מתוך חצי</b>: ${M(F(1,2)+' · '+F(1,2)+' = '+F(1,4))}. "חלק מתוך חלק" זה בדיוק כפל שברים!<br>
+    לכן אפשר לכתוב <b>הסתברות על כל ענף</b> ו<b>לכפול לאורך המסלול</b>, במקום לספור.`,
+  items:[
+  { q:`מטילים מטבע, ואחר כך מסובבים סביבון עם 4 גזרות שוות: צהוב, ירוק, כחול, אדום.
+     <ol class="parts">
+      <li>שרטטו עץ מלא. בעזרת ספירה: מה ההסתברות לקבל "פלי" <b>וגם</b> צבע שאינו צהוב?</li>
+      <li>עכשיו שרטטו <b>עץ מקוצר</b>: לסביבון יש רק שני ענפים – "צהוב" ו"לא צהוב". כתבו הסתברות על כל ענף.</li>
+      <li>כפלו לאורך המסלול פלי ← לא צהוב. האם יצא כמו בסעיף א?</li>
+      <li>בעץ המקוצר יש רק 4 קצוות. למה ההסתברות של "פלי ולא צהוב" <b>איננה</b> ${M(F(1,4))}?</li>
+     </ol>`,
+    treeLabel:'הצג את שני העצים',
+    tree:`<b>עץ מלא:</b><br>${tree(COIN,SPIN4)}<br><br><b>עץ מקוצר:</b><br>${tree(COIN,YEL,{p:true})}`,
+    ans:`א. 3 קצוות מתוך 8: ${M(F(3,8))}<br>ב. מטבע: ${M(F(1,2))} לכל ענף. סביבון: ${M('צהוב '+F(1,4))}, ${M('לא צהוב '+F(3,4))}<br>
+         ג. ${M(F(1,2)+' · '+F(3,4)+' = '+F(3,8))} ✓<br>
+         ד. בעץ המקוצר הקצוות <b>לא שווי סיכוי</b> – "לא צהוב" מכיל 3 גזרות, ו"צהוב" רק גזרה אחת. בעץ כזה אסור לספור קצוות – צריך לכפול.` },
+
+  { q:`מטילים מטבע ואחר כך קובייה. שרטטו עץ מקוצר: למטבע "עץ" / "פלי", לקובייה "6" / "לא 6".
+     <ol class="parts">
+      <li>כתבו הסתברות על כל ענף.</li>
+      <li>מצאו בעזרת כפל את ההסתברות של כל אחד מ־4 הקצוות.</li>
+      <li>חברו את ארבע ההסתברויות. כמה יצא? למה?</li>
+      <li>בדקו את הקצה "עץ, לא 6" בעזרת ספירה בעץ המלא של תרגיל 1.</li>
+     </ol>`,
+    tree:tree(COIN,SIX,{p:true}),
+    ans:`ב. עץ,6: ${M(F(1,12))} &nbsp; עץ,לא 6: ${M(F(5,12))} &nbsp; פלי,6: ${M(F(1,12))} &nbsp; פלי,לא 6: ${M(F(5,12))}<br>
+         ג. הסכום הוא 1, כי ארבעת הקצוות מכסים את כל האפשרויות ואין ביניהם חפיפה.<br>
+         ד. בעץ המלא יש 5 קצוות של "עץ" עם מספר שאינו 6, מתוך 12: ${M(F(5,12))} ✓` }
+  ]
+},
+
+{ title:'חלק ג – כשהספירה כבר לא נוחה (או בלתי אפשרית)',
+  intro:'מכאן והלאה – פתרו בעזרת <b>כפל לאורך הענפים</b>. כשיש כמה מסלולים מתאימים – כופלים בכל מסלול ו<b>מחברים</b> את המסלולים.',
+  items:[
+  { q:`מטילים קובייה 3 פעמים.
+     <ol class="parts">
+      <li>כמה קצוות היו בעץ המלא?</li>
+      <li>מה ההסתברות לקבל 6 בכל שלוש ההטלות?</li>
+      <li>מה ההסתברות שבכל שלוש ההטלות יצא מספר זוגי?</li>
+     </ol>`,
+    tree:`העץ המלא: 6 ענפים, מכל ענף יוצאים 6, ומכל אחד מהם שוב 6…<br>${M('6 · 6 · 6 = 216')} קצוות. לא נשרטט אותו 🙂 – בדיוק בגלל זה כדאי לכפול.`,
+    ans:`א. 216<br>ב. ${M(F(1,6)+' · '+F(1,6)+' · '+F(1,6)+' = '+F(1,216))}<br>ג. ${M(F(1,2)+' · '+F(1,2)+' · '+F(1,2)+' = '+F(1,8))}` },
+
+  { q:`מטילים מטבע 5 פעמים.
+     <ol class="parts">
+      <li>כמה תוצאות אפשריות יש?</li>
+      <li>מה ההסתברות לקבל "עץ" בכל 5 ההטלות?</li>
+      <li>מה ההסתברות שלא יתקבל "עץ" אף פעם?</li>
+      <li>מה ההסתברות לקבל "עץ" לפחות פעם אחת? (רמז: משלים)</li>
+     </ol>`,
+    ans:`א. ${M('2·2·2·2·2 = 32')}<br>ב. ${M('('+F(1,2)+')<sup>5</sup> = '+F(1,32))}<br>ג. ${M(F(1,32))}<br>ד. ${M('1 − '+F(1,32)+' = '+F(31,32))}` },
+
+  { q:`בשק יש 3 כדורים אדומים ו־2 כדורים כחולים. מוציאים כדור, רושמים את צבעו ו<b>מחזירים</b> אותו לשק. אחר כך מוציאים כדור שוב.
+     <ol class="parts">
+      <li>מספרו את הכדורים 1–5 ובנו טבלה. כמה תוצאות יש? מה ההסתברות ששני הכדורים אדומים (בספירה)?</li>
+      <li>שרטטו עץ מקוצר עם הענפים "אדום" / "כחול" וחשבו את אותה הסתברות בעזרת כפל.</li>
+      <li>דני אמר: "בעץ יש 4 קצוות: אא, אכ, כא, ככ. לכן ההסתברות לשני אדומים היא ${M(F(1,4))}". מה הטעות של דני?</li>
+     </ol>`,
+    treeLabel:'הצג טבלה ועץ',
+    tree:`${bagGrid}<br>${tree(BAG,BAG,{p:true})}`,
+    ans:`א. 25 תוצאות. 9 משבצות של אדום־אדום: ${M(F(9,25))}<br>ב. ${M(F(3,5)+' · '+F(3,5)+' = '+F(9,25))} ✓<br>
+         ג. 4 הקצוות <b>לא שווי סיכוי</b> – יש יותר כדורים אדומים, אז "אדום" סביר יותר מ"כחול". בעץ כזה כופלים, לא סופרים קצוות.` },
+
+  { q:`אותו שק (3 אדומים, 2 כחולים, עם החזרה). מה ההסתברות לקבל כדור אחד אדום וכדור אחד כחול (בסדר כלשהו)?<br>
+       פתרו בעזרת העץ, ובדקו בטבלה מהתרגיל הקודם.`,
+    tree:tree(BAG,BAG,{p:true,leaf:prodLeaf}),
+    ans:`שני מסלולים: אדום←כחול וכחול←אדום.<br>${M(F(3,5)+' · '+F(2,5)+' + '+F(2,5)+' · '+F(3,5)+' = '+F(6,25)+' + '+F(6,25)+' = '+F(12,25))}<br>בטבלה: 12 משבצות מתוך 25 ✓` },
+
+  { q:`שחקן כדורסל קולע זריקת עונשין בהסתברות 0.7. הוא זורק 2 זריקות (כל זריקה לא תלויה בקודמת).
+     <ol class="parts">
+      <li>מה ההסתברות שיקלע בשתי הזריקות?</li>
+      <li>מה ההסתברות שיקלע בדיוק פעם אחת?</li>
+      <li>מה ההסתברות שיחטיא בשתיהן?</li>
+      <li>חברו את שלוש התשובות. מה קיבלתם?</li>
+      <li>למה כאן אי אפשר לפתור בעזרת "רצוי חלקי מצוי"?</li>
+     </ol>`,
+    tree:tree(SHOT,SHOT,{p:true}),
+    ans:`א. ${M('0.7 · 0.7 = 0.49')}<br>ב. ${M('0.7·0.3 + 0.3·0.7 = 0.42')}<br>ג. ${M('0.3 · 0.3 = 0.09')}<br>ד. ${M('0.49 + 0.42 + 0.09 = 1')}<br>
+         ה. אין כאן רשימה של תוצאות <b>שוות סיכוי</b> שאפשר לספור – יש רק הסתברויות. כפל עובד גם במקרה כזה.` },
+
+  { q:`לסביבון יש 3 גזרות <b>לא שוות</b>: אדום – חצי מהסביבון, כחול – שליש, ירוק – שישית. מסובבים פעמיים.
+     <ol class="parts">
+      <li>מה ההסתברות לקבל אדום בשני הסיבובים?</li>
+      <li>מה ההסתברות לקבל את אותו צבע בשני הסיבובים?</li>
+      <li>מה ההסתברות לקבל שני צבעים שונים?</li>
+     </ol>`,
+    tree:tree(SPINU,SPINU,{p:true}),
+    ans:`א. ${M(F(1,2)+' · '+F(1,2)+' = '+F(1,4))}<br>
+         ב. ${M(F(1,4)+' + '+F(1,9)+' + '+F(1,36)+' = '+F(9,36)+' + '+F(4,36)+' + '+F(1,36)+' = '+F(14,36)+' = '+F(7,18))}<br>
+         ג. ${M('1 − '+F(7,18)+' = '+F(11,18))}` },
+
+  { q:`⭐ <b>אתגר:</b> מטילים קובייה ואחר כך מטבע. מה ההסתברות לקבל 6 <b>או</b> "עץ" (לפחות אחד מהם)?<br>
+       פתרו בשתי דרכים: (1) ספירה בעץ המלא, (2) כפל בעץ מקוצר.`,
+    tree:tree(SIX,COIN,{p:true,leaf:prodLeaf}),
+    ans:`ספירה: 6 קצוות של "6" ועוד 5 קצוות של "לא 6, עץ" – 7 מתוך 12: ${M(F(7,12))}<br>
+         כפל: ${M(F(1,12)+' + '+F(1,12)+' + '+F(5,12)+' = '+F(7,12))}<br>
+         או בעזרת משלים: ${M('1 − '+F(5,6)+' · '+F(1,2)+' = 1 − '+F(5,12)+' = '+F(7,12))}` }
+  ]
+}
+];
+
+// ---------- העץ הנכון: עץ מקוצר עם התוצאות שבכל ענף ----------
+const S=(l,p,set)=>({l,p,set});
+const EVEN=[S('זוגי','1/2','{2, 4, 6}'),S('אי־זוגי','1/2','{1, 3, 5}')];
+const REDs=[S('אדום','1/3','{אדום}'),S('לא אדום','2/3','{כחול, ירוק}')];
+const GT4=[S('גדול מ־4','1/3','{5, 6}'),S('עד 4','2/3','{1, 2, 3, 4}')];
+const ONE=[S('1','1/6','{1}'),S('לא 1','5/6','{2, 3, 4, 5, 6}')];
+const YELs=[S('צהוב','1/4','{צהוב}'),S('לא צהוב','3/4','{ירוק, כחול, אדום}')];
+const SIXs=[S('6','1/6','{6}'),S('לא 6','5/6','{1, 2, 3, 4, 5}')];
+const BAGs=[S('אדום','3/5','{1, 2, 3}'),S('כחול','2/5','{4, 5}')];
+const lab=p=>p.map(b=>b.l);
+
+const CORRECT={
+ 1:[{t:'עץ מקוצר: מטבע, ואז קובייה – זוגי / אי־זוגי',
+     svg:ctree([COIN,EVEN],{mark:p=>lab(p).join()=='עץ,זוגי'?'ב':''})}],
+ 2:[{t:'עץ מקוצר: סביבון – אדום / לא אדום, ואז מטבע',
+     svg:ctree([REDs,COIN],{mark:p=>{const s=lab(p).join();return s=='אדום,פלי'?'א':s=='לא אדום,עץ'?'ב':'';}})}],
+ 3:[{t:'סעיף א: בכל קובייה – גדול מ־4 / עד 4',
+     svg:ctree([GT4,GT4],{mark:p=>lab(p).join()=='גדול מ־4,גדול מ־4'?'א':''})},
+    {t:'סעיף ב: קובייה ראשונה – 1 / לא 1, קובייה שנייה – זוגי / אי־זוגי',
+     svg:ctree([ONE,EVEN],{mark:p=>lab(p).join()=='1,זוגי'?'ב':''})}],
+ 4:[{t:'עץ מקוצר: מטבע, ואז סביבון – צהוב / לא צהוב',
+     svg:ctree([COIN,YELs],{mark:p=>lab(p).join()=='פלי,לא צהוב'?'א, ג':''})}],
+ 5:[{t:'עץ מקוצר: מטבע, ואז קובייה – 6 / לא 6',
+     svg:ctree([COIN,SIXs],{mark:p=>lab(p).join()=='עץ,לא 6'?'ד':''})}],
+ 6:[{t:'סעיף ב: בכל הטלה – 6 / לא 6',
+     svg:ctree([SIXs,SIXs,SIXs],{mark:p=>p.every(b=>b.l=='6')?'ב':''})},
+    {t:'סעיף ג: בכל הטלה – זוגי / אי־זוגי',
+     svg:ctree([EVEN,EVEN,EVEN],{mark:p=>p.every(b=>b.l=='זוגי')?'ג':''})}],
+ 7:[{t:'ממשיכים לפצל רק ענפים שעוד יכולים להתאים (…= ענף שכבר לא מתאים). סעיף ד: 1 פחות המסלול של "אין עץ".',
+     svg:ctree([COIN,COIN,COIN,COIN,COIN],{prune:p=>p.every(b=>b.l==p[0].l),
+       mark:p=>p.every(b=>b.l=='עץ')?'ב':p.every(b=>b.l=='פלי')?'ג':''})}],
+ 8:[{t:'בכל הוצאה – אדום (כדורים 1, 2, 3) / כחול (כדורים 4, 5)',
+     svg:ctree([BAGs,BAGs],{mark:p=>lab(p).join()=='אדום,אדום'?'א, ב':''})}],
+ 9:[{t:'בכל הוצאה – אדום (כדורים 1, 2, 3) / כחול (כדורים 4, 5)',
+     svg:ctree([BAGs,BAGs],{mark:p=>p[0].l!=p[1].l?' ':''})}],
+ 10:[{t:'בכל זריקה – קלע / החטיא',
+     svg:ctree([SHOT,SHOT],{mark:p=>{const k=p.filter(b=>b.l=='קלע').length;return k==2?'א':k==1?'ב':'ג';}})}],
+ 11:[{t:'בכל סיבוב – אדום / כחול / ירוק',
+     svg:ctree([SPINU,SPINU],{mark:p=>p[0].l==p[1].l?(p[0].l=='אדום'?'א, ב':'ב'):'ג'})}],
+ 12:[{t:'עץ מקוצר: קובייה – 6 / לא 6, ואז מטבע',
+     svg:ctree([SIXs,COIN],{mark:p=>(p[0].l=='6'||p[1].l=='עץ')?' ':''})}]
+};
+const LEGEND=`<div style="font-size:14px;margin-bottom:8px">על כל ענף: <b style="color:#c62828">ההסתברות</b>, ומתחת לצומת – <b style="color:#666">התוצאות שהענף מכיל</b>. בסוף כל מסלול – מכפלת ההסתברויות. <b style="color:#2e7d32">בירוק</b> – המסלולים של המאורע המבוקש (האות = הסעיף).</div>`;
+
+// ---------- בניית הדף ----------
+let n=0, html='';
+SECTIONS.forEach(sec=>{
+  html+=`<h2>${sec.title}</h2>`;
+  if(sec.intro) html+=`<div class="info">${sec.intro}</div>`;
+  sec.items.forEach(ex=>{
+    n++;
+    html+=`<div class="ex"><h3>תרגיל ${n}</h3><div>${ex.q}</div><div class="btns">`;
+    if(ex.tree) html+=`<button class="b-tree" onclick="tg('t${n}')">${ex.treeLabel||'הצג עץ'}</button>`;
+    if(CORRECT[n]) html+=`<button class="b-cor" onclick="tg('k${n}')">🌳 העץ הנכון</button>`;
+    html+=`<button class="b-ans" onclick="tg('a${n}')">תשובה סופית</button></div>`;
+    if(ex.tree) html+=`<div class="panel" id="t${n}">${ex.tree}</div>`;
+    if(CORRECT[n]) html+=`<div class="panel" id="k${n}" style="background:#fffaf2;border-color:#f3d3a6">${LEGEND}${CORRECT[n].map(c=>`<p style="margin:10px 0 4px"><b>${c.t}</b></p>${c.svg}`).join('')}</div>`;
+    html+=`<div class="panel ans" id="a${n}">${ex.ans}</div></div>`;
+  });
+  if(sec.after){
+    html+=`<div class="btns"><button class="b-info" onclick="tg('concl')">${sec.after.label}</button></div>
+           <div class="panel" id="concl" style="background:#fff8e1;border-color:#f4b400">${sec.after.html}</div>`;
+  }
+});
+html+=`<div class="summary"><b>📌 סיכום – כלל המכפלה</b><br>
+  • כשמבצעים כמה ניסויים ש<b>לא משפיעים זה על זה</b> (כמו הטלות, סיבובים, או הוצאה <b>עם החזרה</b>), כותבים על כל ענף את ההסתברות שלו.<br>
+  • הסתברות של מסלול = <b>מכפלת</b> ההסתברויות לאורך הענפים.<br>
+  • אם כמה מסלולים מתאימים למאורע – <b>מחברים</b> את ההסתברויות שלהם.<br>
+  • בעץ מקוצר הקצוות לא תמיד שווי סיכוי – לכן לא סופרים קצוות, אלא כופלים.</div>`;
+document.getElementById('app').innerHTML=html;
+function tg(id){document.getElementById(id).classList.toggle('open');}
+</script>
+</body>
+</html>
